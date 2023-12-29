@@ -1,5 +1,6 @@
 contests/
 users.json
+build/
 
 ### IntelliJ IDEA ###
 out/

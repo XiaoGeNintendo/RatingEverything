@@ -2,16 +2,22 @@ package com.hhs.xgn.rating
 
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import freemarker.template.Configuration
+import freemarker.template.TemplateExceptionHandler
 import java.io.File
 import java.nio.charset.Charset
 import java.util.*
 import kotlin.collections.ArrayList
+import kotlin.collections.HashSet
 
 
 val contests = HashMap<String, Contest>()
 var users = HashMap<String, User>()
+lateinit var freemarkerConfiguration: Configuration
 
 const val UTF8_BOM = "\uFEFF"
+const val BUILD_ROOT = "build"
+
 fun removeUTF8BOM(str: String): String {
     return if (str.startsWith(UTF8_BOM)) {
         str.substring(1)
@@ -76,47 +82,66 @@ fun Int.toSignedString(): String {
     }
 }
 
+val mathsRegions = RatingRegions(
+    listOf(
+        RatingRegion(-9999, 1350, "Weak", "cccccc"),
+        RatingRegion(1350, 1450, "OK", "77ff77"),
+        RatingRegion(1450, 1600, "Decent", "77ddbb"),
+        RatingRegion(1600, 1700, "Strong", "aaaaff"),
+        RatingRegion(1700, 1800, "Very Strong", "ff88ff"),
+        RatingRegion(1800, 1900, "Super Strong", "ffcc88"),
+        RatingRegion(1900, 9999, "Super Strong!!", "ff3333")
+    )
+)
+
+val csRegions = RatingRegions(
+    listOf(
+        RatingRegion(-9999, 1200, "Newbie", "cccccc"),
+        RatingRegion(1200, 1400, "Pupil", "77ff77"),
+        RatingRegion(1400, 1600, "Specialist", "77ddbb"),
+        RatingRegion(1600, 1900, "Expert", "aaaaff"),
+        RatingRegion(1900, 2100, "Candidate Master", "ff88ff"),
+        RatingRegion(2100, 2300, "Master", "ffcc88"),
+        RatingRegion(2300, 2400, "International Master", "ffbb55"),
+        RatingRegion(2400, 2600, "Grandmaster", "ff7777"),
+        RatingRegion(2600, 3000, "International Grandmaster", "ff3333"),
+        RatingRegion(3000, 9999, "Legendary Grandmaster", "aa0000")
+    )
+)
+
+fun getRatingRegions(name: String):RatingRegions{
+    return if(name=="Maths"){
+        mathsRegions
+    }else{
+        csRegions
+    }
+}
+
 fun getRank(name: String, r: Int): String {
     if (name == "Maths") {
-        return if (r >= 2000) {
-            "Super Strong!!"
-        } else if (r >= 1900) {
-            "Super Strong"
-        } else if (r >= 1700) {
-            "Strong"
-        } else if (r >= 1450) {
-            "Decent"
-        } else if (r >= 1350) {
-            "OK"
-        } else {
-            "Weak"
-        }
+        return mathsRegions.getRank(r)!!
     }
-    return if (r >= 3000) {
-        "Legendary Grandmaster"
-    } else if (r >= 2600) {
-        "International Grandmaster"
-    } else if (r >= 2400) {
-        "Grandmaster"
-    } else if (r >= 2300) {
-        "International Master"
-    } else if (r >= 2100) {
-        "Master"
-    } else if (r >= 1900) {
-        "Candidate Master"
-    } else if (r >= 1600) {
-        "Expert"
-    } else if (r >= 1400) {
-        "Specialist"
-    } else if (r >= 1200) {
-        "Pupil"
-    } else {
-        "Newbie"
+    return csRegions.getRank(r)!!
+}
+
+fun getRankColor(name: String, r: Int): String {
+    if (name == "Maths") {
+        return mathsRegions.getRankColor(r)!!
     }
+    return csRegions.getRankColor(r)!!
 }
 
 fun main(args: Array<String>) {
     println("Loading Rating System...")
+
+    freemarkerConfiguration = Configuration(Configuration.VERSION_2_3_32)
+    freemarkerConfiguration.setDirectoryForTemplateLoading(File("templates"))
+    freemarkerConfiguration.defaultEncoding = "UTF-8"
+    freemarkerConfiguration.templateExceptionHandler = TemplateExceptionHandler.RETHROW_HANDLER
+    freemarkerConfiguration.logTemplateExceptions = false
+    freemarkerConfiguration.wrapUncheckedExceptions = true
+    freemarkerConfiguration.fallbackOnNullLoopVariable = false
+    freemarkerConfiguration.sqlDateAndTimeTimeZone = TimeZone.getDefault()
 
     loadContests()
     loadUsers()
@@ -151,7 +176,13 @@ fun main(args: Array<String>) {
                     for (c in f.changes) {
                         val r1 = getRank(rating.key, nowRating)
                         val r2 = getRank(rating.key, nowRating + c.delta)
-                        println("${c.name} ${c.delta.toSignedString()} $nowRating --> ${nowRating + c.delta} [Points ${c.point} and ranking ${c.rank}] (${if (r1 != r2) "Became $r1 -> $r2" else "∅"})")
+                        println(
+                            "${c.name} ${c.delta.toSignedString()} $nowRating --> ${nowRating + c.delta} [Points ${c.point} and ranking ${c.rank}/${c.totalParticipants}(Top ${
+                                "%.2f".format(
+                                    100.0 * c.rank / c.totalParticipants
+                                )
+                            }%)] (${if (r1 != r2) "Became $r1 -> $r2" else "∅"})"
+                        )
                         nowRating += c.delta
                     }
                 }
@@ -240,8 +271,8 @@ fun main(args: Array<String>) {
                 println("Delta preview:")
                 var rank = 1
                 println("Rank Name -- Score Delta")
-                val ranks=HashMap<String,Int>()
-                val points=HashMap<String,Double>()
+                val ranks = HashMap<String, Int>()
+                val points = HashMap<String, Double>()
 
                 for ((now, row) in c.rows.withIndex()) {
 
@@ -250,8 +281,8 @@ fun main(args: Array<String>) {
                     }
                     println("$rank  ${row.name} -- [${row.points}] (${delta[row.name]}) ${users[row.name]!!.ratings[c.category]!!.rating} ${users[row.name]!!.ratings[c.category]!!.rating + delta[row.name]!!}")
 
-                    ranks[row.name]=rank
-                    points[row.name]=row.points
+                    ranks[row.name] = rank
+                    points[row.name] = row.points
                 }
                 println("Is this OK? [y/n]")
                 val ok = scanner.nextLine()
@@ -261,7 +292,7 @@ fun main(args: Array<String>) {
                     for (e in delta) {
                         val r = users[e.key]!!.ratings[c.category]!!
                         r.rating += e.value
-                        r.changes += RatingChange(c.name, e.value,ranks[e.key]!!,points[e.key]!!)
+                        r.changes += RatingChange(c.name, e.value, ranks[e.key]!!, c.rows.size, points[e.key]!!)
                     }
                     c.rated = true
                     if ("Δ" !in c.head) {
@@ -274,7 +305,7 @@ fun main(args: Array<String>) {
                     saveUsers()
                     saveContest(c)
                     println("Rating Saved!")
-                }else{
+                } else {
                     println("Discarded")
                 }
             } else {
@@ -282,27 +313,144 @@ fun main(args: Array<String>) {
             }
         }
 
-        if(line[0]=="rank"){
+        if (line[0] == "rank") {
 
-            val x=ArrayList<Pair<Int,String>>()
+            val x = ArrayList<Pair<Int, String>>()
 
-            for(u in users){
-                if(line[1] in u.value.ratings.keys){
-                    x.add(Pair(u.value.ratings[line[1]]!!.rating,u.key))
+            for (u in users) {
+                if (line[1] in u.value.ratings.keys) {
+                    x.add(Pair(u.value.ratings[line[1]]!!.rating, u.key))
                 }
             }
             println(line[1])
             x.sortBy { -it.first }
 
-            var rk=1
+            var rk = 1
             println("Leaderboard of ${line[1]}")
-            for((now, y) in x.withIndex()){
-                if(now>0 && x[now].first!=x[now-1].first){
-                    rk=now+1
+            for ((now, y) in x.withIndex()) {
+                if (now > 0 && x[now].first != x[now - 1].first) {
+                    rk = now + 1
                 }
 
-                println("$rk ${y.second} Rating: ${y.first} ${getRank(line[1],y.first)} Contests:${users[y.second]!!.ratings[line[1]]!!.changes.size}")
+                println(
+                    "$rk ${y.second} Rating: ${y.first} ${
+                        getRank(
+                            line[1],
+                            y.first
+                        )
+                    } Contests:${users[y.second]!!.ratings[line[1]]!!.changes.size}"
+                )
             }
+        }
+
+        if (line[0] == "build") {
+            println("This will build a website for visualize data in $BUILD_ROOT/ folder. Continue? [y/n]")
+            val ok = scanner.nextLine()
+            if (ok !in arrayOf("y", "Y")) {
+                println("Cancelled")
+                continue
+            }
+
+
+            val root = File(BUILD_ROOT)
+            if (!root.exists()) {
+                root.mkdir()
+            }
+            if (!root.isDirectory) {
+                println("Error: seems $BUILD_ROOT is not a directory. Aborted.")
+                continue
+            }
+
+            var failed = false
+
+            val allSubject=HashSet<String>()
+            for(i in users.map { it.value.ratings.keys }){
+                allSubject.addAll(i)
+            }
+
+            for(subject in allSubject){
+                println("Creating: RANK file for $subject")
+                val outputFile = File("$BUILD_ROOT/$subject/RANK.html")
+                val parameter = HashMap<String, Any>()
+                parameter["subjectname"] = subject
+
+                data class FreemarkerStandingRow(val name:String, val rating: Int, val contestCount: Int, var rank:Int=0)
+
+                val standing=ArrayList<FreemarkerStandingRow>()
+                for((username, user) in users){
+                    if(subject in user.ratings.keys){
+                        val r=user.ratings[subject]!!
+                        standing.add(FreemarkerStandingRow(username,r.rating,r.changes.size))
+                    }
+                }
+                standing.sortBy { -it.rating }
+
+                for((index, row) in standing.withIndex()){
+                    if(index==0){
+                        row.rank=1
+                    }else if(row.rating<standing[index-1].rating){
+                        row.rank=index+1
+                    }else{
+                        row.rank=standing[index-1].rank
+                    }
+                }
+
+                parameter["rank"]=standing
+                parameter["master"]=object: Any() {
+                    fun getRank(r:Int):String{
+                        return getRank(subject,r)
+                    }
+                    fun getRankColor(r:Int):String{
+                        return getRankColor(subject,r)
+                    }
+                }
+                val template = freemarkerConfiguration.getTemplate("rank.ftl")
+                template.process(parameter, outputFile.writer(Charset.forName("utf-8")))
+
+            }
+            for ((name, user) in users) {
+                for ((subject, rating) in user.ratings) {
+                    val subjectFolder = File("$BUILD_ROOT/$subject")
+                    if (!subjectFolder.exists()) {
+                        subjectFolder.mkdirs()
+                    }
+                    if (!subjectFolder.isDirectory) {
+                        println("Error: seems $BUILD_ROOT/$subject is not a directory. Aborted.")
+                        failed = true
+                        break
+                    }
+
+                    val filename = "$BUILD_ROOT/$subject/$name.html"
+                    println("Creating: $filename")
+                    val file = File(filename)
+                    val parameter = HashMap<String, Any>()
+                    parameter["username"] = name
+                    parameter["user"] = user
+                    parameter["subjectname"] = subject
+                    parameter["ratingHistory"] = rating.getRatingHistory()
+                    parameter["ratingChanges"] = rating.changes
+                    parameter["rating"] = rating.rating
+                    parameter["otherSubjects"] = user.ratings.keys.filter { it!=subject }
+
+                    parameter["master"]=object: Any() {
+                        fun getRank(r:Int):String{
+                            return getRank(subject,r)
+                        }
+                        fun getRankColor(r:Int):String{
+                            return getRankColor(subject,r)
+                        }
+                    }
+                    parameter["ratingRegionText"] = getRatingRegions(subject).ratingRegions.joinToString(",","[","]"){"{from:${it.l},to:${it.r},color:'#${it.color}',label:{text:'${it.name}',style:{color:'#606060'}}}"}
+                    val template = freemarkerConfiguration.getTemplate("user.ftl")
+                    template.process(parameter, file.writer(Charset.forName("utf-8")))
+
+                }
+                if (failed) {
+                    break
+                }
+            }
+
+
         }
     }
 }
