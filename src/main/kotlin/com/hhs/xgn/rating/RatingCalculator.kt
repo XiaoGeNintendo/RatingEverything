@@ -28,6 +28,7 @@ class RatingCalculator {
             )
         }
         process(contestants)
+//        println(contestants)
         val ratingChanges = HashMap<String, Int>()
         for (contestant in contestants) {
             ratingChanges[contestant.party] = contestant.delta
@@ -59,6 +60,7 @@ class RatingCalculator {
         var right = 8000
         while (right - left > 1) {
             val mid = (left + right) / 2
+//            println("$left $right =$mid ${getSeed(contestants,mid)} ${rank}")
             if (getSeed(contestants, mid) < rank) {
                 right = mid
             } else {
@@ -117,6 +119,7 @@ class RatingCalculator {
         }
         sortByRatingDesc(contestants)
 
+//        println(contestants)
         // Total sum should not be more than zero.
         run {
             var sum = 0
@@ -181,7 +184,7 @@ class RatingCalculator {
         contestants.sortWith { o1, o2 -> -o1.rating.compareTo(o2.rating) }
     }
 
-    class Contestant(party: String, rank: Int, points: Double, rating: Int) {
+     class Contestant(party: String, rank: Int, points: Double, rating: Int) {
         val party: String
         var rank: Double
         val points: Double
@@ -196,7 +199,11 @@ class RatingCalculator {
             this.points = points
             this.rating = rating
         }
-    }
+
+         override fun toString(): String {
+             return "Contestant(party='$party', rank=$rank, points=$points, rating=$rating, needRating=$needRating, seed=$seed, delta=$delta)"
+         }
+     }
 
     companion object {
         private const val INITIAL_RATING = 1500

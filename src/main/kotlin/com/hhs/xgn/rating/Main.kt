@@ -157,6 +157,7 @@ fun main(args: Array<String>) {
             println("contest <name> -- show a standing")
             println("pend <name> -- pend rating of a contest")
             println("rank <name> -- show ranking on a given aspect")
+            println("build -- generate an interactive website showing the rank")
         }
 
         if (line[0] == "users") {
@@ -266,6 +267,9 @@ fun main(args: Array<String>) {
 
                     previousRatings[u.name] = u.ratings[c.category]!!.rating
                 }
+//                println(previousRatings)
+//                println(c.rows)
+
                 val delta = calculator.calculateRatingChanges(previousRatings, c.rows)
 
                 println("Delta preview:")
@@ -368,11 +372,19 @@ fun main(args: Array<String>) {
                 allSubject.addAll(i)
             }
 
+            run {
+                println("Creating index")
+                val indexFile = File("$BUILD_ROOT/index.html")
+
+                val parameter = HashMap<String, Any>()
+                parameter["subjects"] = allSubject
+                val template = freemarkerConfiguration.getTemplate("index.ftl")
+                template.process(parameter, indexFile.writer(Charset.forName("utf-8")))
+
+            }
             for(subject in allSubject){
                 println("Creating: RANK file for $subject")
                 val outputFile = File("$BUILD_ROOT/$subject/RANK.html")
-                val parameter = HashMap<String, Any>()
-                parameter["subjectname"] = subject
 
                 data class FreemarkerStandingRow(val name:String, val rating: Int, val contestCount: Int, var rank:Int=0)
 
@@ -395,6 +407,8 @@ fun main(args: Array<String>) {
                     }
                 }
 
+                val parameter = HashMap<String, Any>()
+                parameter["subjectname"] = subject
                 parameter["rank"]=standing
                 parameter["master"]=object: Any() {
                     fun getRank(r:Int):String{

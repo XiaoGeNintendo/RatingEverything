@@ -27,6 +27,10 @@ For example:
 - `user XGN`
 - `rank CS`
 
+# Building & Contribution
+This code is written so poorly that I do not expect anyone to build or contribute.
+
+For the reason, it starts as a temporary project.
 # Note
 Please pay attention to the upper/lower cases of your input.
 
