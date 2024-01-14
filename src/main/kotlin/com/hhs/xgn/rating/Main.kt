@@ -383,6 +383,17 @@ fun main(args: Array<String>) {
 
             }
             for(subject in allSubject){
+                
+                val subjectFolder = File("$BUILD_ROOT/$subject")
+                if (!subjectFolder.exists()) {
+                    subjectFolder.mkdirs()
+                }
+                if (!subjectFolder.isDirectory) {
+                    println("Error: seems $BUILD_ROOT/$subject is not a directory. Aborted.")
+                    failed = true
+                    break
+                }
+
                 println("Creating: RANK file for $subject")
                 val outputFile = File("$BUILD_ROOT/$subject/RANK.html")
 
@@ -424,15 +435,6 @@ fun main(args: Array<String>) {
             }
             for ((name, user) in users) {
                 for ((subject, rating) in user.ratings) {
-                    val subjectFolder = File("$BUILD_ROOT/$subject")
-                    if (!subjectFolder.exists()) {
-                        subjectFolder.mkdirs()
-                    }
-                    if (!subjectFolder.isDirectory) {
-                        println("Error: seems $BUILD_ROOT/$subject is not a directory. Aborted.")
-                        failed = true
-                        break
-                    }
 
                     val filename = "$BUILD_ROOT/$subject/$name.html"
                     println("Creating: $filename")

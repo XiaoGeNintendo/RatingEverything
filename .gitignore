@@ -1,6 +1,7 @@
 contests/
 users.json
 build/
+_build/
 
 ### IntelliJ IDEA ###
 out/
@@ -31,3 +32,5 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+_users.json
+build.zip

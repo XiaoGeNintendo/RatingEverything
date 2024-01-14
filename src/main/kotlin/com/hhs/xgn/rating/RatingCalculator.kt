@@ -46,22 +46,24 @@ class RatingCalculator {
     }
 
 
-    private fun getSeed(contestants: List<Contestant>, rating: Int): Double {
+    private fun getSeed(contestants: List<Contestant>, rating: Int, removeMe: Contestant): Double {
         val extraContestant = Contestant("", 0, 0.0, rating)
         var result = 1.0
         for (other in contestants) {
-            result += getEloWinProbability(other, extraContestant)
+            if(other!=removeMe) {
+                result += getEloWinProbability(other, extraContestant)
+            }
         }
         return result
     }
 
-    private fun getRatingToRank(contestants: List<Contestant>, rank: Double): Int {
+    private fun getRatingToRank(contestants: List<Contestant>, rank: Double, removeMe: Contestant): Int {
         var left = 1
         var right = 8000
         while (right - left > 1) {
             val mid = (left + right) / 2
-//            println("$left $right =$mid ${getSeed(contestants,mid)} ${rank}")
-            if (getSeed(contestants, mid) < rank) {
+            println("$left $right =$mid ${getSeed(contestants,mid, removeMe)} ${rank}")
+            if (getSeed(contestants, mid,removeMe) < rank) {
                 right = mid
             } else {
                 left = mid
@@ -114,12 +116,12 @@ class RatingCalculator {
         }
         for (contestant in contestants) {
             val midRank = sqrt(contestant.rank * contestant.seed)
-            contestant.needRating = getRatingToRank(contestants, midRank)
+            contestant.needRating = getRatingToRank(contestants, midRank, contestant)
             contestant.delta = (contestant.needRating - contestant.rating) / 2
         }
         sortByRatingDesc(contestants)
 
-//        println(contestants)
+        println(contestants)
         // Total sum should not be more than zero.
         run {
             var sum = 0
